@@ -1,0 +1,406 @@
+-e 
+
+### FILE: src/app/api/prezzi-test/route.ts ###
+
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+
+export async function GET() {
+  const cookieStore = cookies();
+  const email = cookieStore.get('user')?.value || '';
+
+  console.log('📧 Email from cookie:', email);
+
+  if (!email) {
+    return NextResponse.json({ error: 'Not logged in' }, { status: 401 });
+  }
+
+  // continua fetch da ERPNext usando email
+  return NextResponse.json({ message: 'OK', email });
+}
+-e 
+
+### FILE: src/app/api/login/route.ts ###
+
+import { NextResponse } from 'next/server';
+
+export async function POST(req: Request) {
+  const { usr, pwd } = await req.json();
+
+  try {
+    const res = await fetch('https://gestionale.sudimport.website/api/method/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usr, pwd }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      return NextResponse.json({ message: data.message || 'Login fehlgeschlagen.' }, { status: 401 });
+    }
+
+    // Recupera il cookie 'sid' dalla risposta originale ERPNext
+    const raw = res.headers.getSetCookie();
+    const sidCookie = raw?.find((c) => c.includes('sid=')) || '';
+
+    const response = NextResponse.json({ message: 'Login erfolgreich' });
+
+    // Imposta cookie nel browser per la sessione
+    if (sidCookie) {
+      const sessionId = sidCookie.split(';')[0].split('=')[1];
+      response.cookies.set('sid', sessionId, {
+        httpOnly: false,
+        path: '/',
+        sameSite: 'lax'
+      });
+    }
+
+    return response;
+  } catch (error) {
+    return NextResponse.json({ message: 'Serverfehler beim Login.' }, { status: 500 });
+  }
+}
+-e 
+
+### FILE: src/app/api/prodotti/route.ts ###
+
+'use server'
+
+import { NextResponse } from 'next/server'
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size))
+  }
+  return out
+}
+
+type LinkEntry = {
+  link_doctype: string
+  link_name: string
+}
+
+type ContactDetail = {
+  links?: LinkEntry[]
+}
+
+async function getCustomer(email: string, headers: Record<string, string>) {
+  const base = process.env.ERP_URL!
+  console.log('🔍 getCustomer: looking for customer linked to email', email)
+  try {
+    const emailRes = await fetch(
+      `${base}/api/resource/Contact Email?filters=${encodeURIComponent(
+        JSON.stringify([["email_id", "=", email]])
+      )}`,
+      { headers }
+    )
+    if (!emailRes.ok) return null
+    const emailJson = await emailRes.json()
+    const contacts: string[] = emailJson.data?.map((e: { parent: string }) => e.parent) || []
+
+    for (const contactName of contacts) {
+      const detRes = await fetch(
+        `${base}/api/resource/Contact/${encodeURIComponent(contactName)}?fields=["links"]`,
+        { headers }
+      )
+      if (!detRes.ok) continue
+      const detJson = await detRes.json()
+      const detail: ContactDetail = detJson.data
+      const customerLink = detail.links?.find(l => l.link_doctype === 'Customer')
+      if (customerLink) {
+        console.log('✅ Customer trovato:', customerLink.link_name)
+        return customerLink.link_name
+      }
+    }
+
+    return null
+  } catch (err) {
+    console.error('❌ ERRORE getCustomer:', err)
+    return null
+  }
+}
+
+export async function GET(req: Request) {
+  const url = new URL(req.url)
+  const categoria = url.searchParams.get('categoria') || undefined
+  const searchTerm = url.searchParams.get('search')?.trim() || undefined
+  const page = parseInt(url.searchParams.get('page') ?? '1', 10)
+  const limit = parseInt(url.searchParams.get('limit') ?? '20', 10)
+  const offset = (page - 1) * limit
+
+  console.log('🟢 API CALL: /api/prodotti')
+  const headers = {
+    Authorization: `token ${process.env.ERP_API_KEY}:${process.env.ERP_API_SECRET}`,
+    'Content-Type': 'application/json'
+  }
+
+  const email = req.headers.get('x-user') || ''
+  const isLoggedIn = Boolean(email)
+  console.log('🔐 User Email:', email)
+
+  try {
+    const filters: [string, string, string][] = []
+    if (categoria) filters.push(['item_group', '=', categoria])
+    if (searchTerm) filters.push(['item_name', 'like', `%${searchTerm}%`])
+
+    const countURL = new URL(`${process.env.ERP_URL}/api/resource/Item`)
+    countURL.searchParams.set('fields', JSON.stringify(['name']))
+    countURL.searchParams.set('limit_start', '0')
+    countURL.searchParams.set('limit_page_length', '999999')
+    if (filters.length > 0) countURL.searchParams.set('filters', JSON.stringify(filters))
+
+    const totalRes = await fetch(countURL.toString(), { headers })
+    const totalJson = await totalRes.json()
+    const total = Array.isArray(totalJson.data) ? totalJson.data.length : 0
+    console.log('📊 Total prodotti trovati:', total)
+
+    const listURL = new URL(`${process.env.ERP_URL}/api/resource/Item`)
+    listURL.searchParams.set(
+      'fields',
+      JSON.stringify(['name', 'item_name', 'item_group', 'image', 'description'])
+    )
+    listURL.searchParams.set('limit_start', String(offset))
+    listURL.searchParams.set('limit_page_length', String(limit))
+    if (filters.length > 0) listURL.searchParams.set('filters', JSON.stringify(filters))
+
+    const listRes = await fetch(listURL.toString(), { headers })
+    const listJson = await listRes.json()
+    const items = Array.isArray(listJson.data) ? listJson.data : []
+
+    const customer = isLoggedIn ? await getCustomer(email, headers) : null
+    console.log('👤 Cliente associato:', customer)
+
+    // 🔴 fetchPrices può essere reinserita qui (funzione esterna separata) se vuoi debug completo anche lì
+    const priceMap = {} // placeholder per evitare errore
+
+    const enriched = items.map(item => {
+      const prices = priceMap[item.name] || {}
+      return {
+        ...item,
+        price: prices.standard || null,
+        personalizedPrice: prices.personalized || null,
+        showPersonalizedPrice:
+          customer && prices.personalized !== null && prices.personalized !== prices.standard,
+        displayPrice:
+          customer && prices.personalized !== null && prices.personalized !== prices.standard
+            ? prices.personalized
+            : prices.standard || null
+      }
+    })
+
+    return NextResponse.json({
+      items: enriched,
+      total,
+      isLoggedIn,
+      customer,
+      searchTerm,
+      categoria,
+      page,
+      limit
+    })
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e.message : 'Internal server error'
+    console.error('❌ ERRORE nella API /api/prodotti:', error)
+    return NextResponse.json({ error, items: [], total: 0 }, { status: 500 })
+  }
+}
+-e 
+
+### FILE: src/app/api/prezzi/route.ts ###
+
+// src/app/api/prezzi/route.ts
+
+import { NextResponse } from 'next/server'
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const email = searchParams.get('email') || ''
+  const item = searchParams.get('item') || ''
+
+  if (!email || !item) {
+    return NextResponse.json({ error: 'email e item sono obbligatori' }, { status: 400 })
+  }
+
+  const erpRes = await fetch(
+    `${process.env.ERP_URL}/api/method/nexterp_customizations.api.shop.get_prezzi_per_listino?email=${encodeURIComponent(email)}`,
+    {
+      headers: {
+        Authorization: `token ${process.env.ERP_API_KEY}:${process.env.ERP_API_SECRET}`,
+      },
+    }
+  )
+
+  if (!erpRes.ok) {
+    const err = await erpRes.json()
+    return NextResponse.json({ error: 'ERPNext error', details: err }, { status: erpRes.status })
+  }
+
+  const { message } = await erpRes.json()
+  const prezzi: Array<{ item_code: string; price_list_rate: number }> = message.prezzi
+
+  const entry = prezzi.find(p => p.item_code === item)
+  if (!entry) {
+    return NextResponse.json({ error: `Nessun prezzo trovato per ${item}` }, { status: 404 })
+  }
+
+  return NextResponse.json({
+    email,
+    item,
+    price: entry.price_list_rate
+  })
+}
+-e 
+
+### FILE: src/app/api/register/route.ts ###
+
+import { NextResponse } from 'next/server';
+
+export async function POST(req: Request) {
+  try {
+    // Estrai i valori dal body della request
+    const {
+      vorname,
+      nachname,
+      firma,
+      telefon,
+      adresse,
+      plz,
+      ort,
+      land,
+      email,
+    } = await req.json();
+
+    // Prepara il payload da inviare a ERPNext
+    const payload = {
+      first_name: vorname,
+      last_name: nachname,
+      company: firma || "",
+      phone: telefon || "",
+      email: email,
+      address: adresse || "",
+      cap: plz || "",
+      citta: ort || "",
+      country: land || "Germany",
+    };
+
+    console.log("Invio dati a ERPNext:", payload);
+
+    const response = await fetch('https://gestionale.sudimport.website/api/method/nexterp_customizations.api.register_customer', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // nessun token necessario per allow_guest
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+    console.log("Risposta ERPNext:", data);
+
+    if (!response.ok || data.exc_type || data.exception) {
+      let msg = data.message || data._server_messages || data.exception || "Registrierung fehlgeschlagen.";
+      if (typeof msg === "string" && msg.startsWith("[") && msg.includes("message")) {
+        try {
+          const arr = JSON.parse(msg);
+          msg = JSON.parse(arr[0]).message || msg;
+        } catch (e) {}
+      }
+      return NextResponse.json({ message: msg }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      message: 'Registrierung erfolgreich. Wir prüfen Ihre Daten und geben den Zugang frei.'
+    });
+
+  } catch (error) {
+    console.error('Errore:', error);
+    return NextResponse.json({ message: 'Serverfehler bei der Registrierung.' }, { status: 500 });
+  }
+}
+-e 
+
+### FILE: src/app/api/logout/route.ts ###
+
+export async function POST() {
+  try {
+    // Logout anche su ERPNext
+    const frappeLogout = await fetch('https://gestionale.sudimport.website/api/method/logout', {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const result = await frappeLogout.json();
+
+    return new Response(JSON.stringify({ success: true, frappe: result }), {
+      status: 200,
+    });
+  } catch (error) {
+    console.error('Logout Error:', error);
+    return new Response(JSON.stringify({ success: false, error: 'Logout failed' }), {
+      status: 500,
+    });
+  }
+}
+-e 
+
+### FILE: src/app/api/user/route.ts ###
+
+import { NextResponse } from 'next/server';
+
+export async function GET(req: Request) {
+  const user = req.headers.get('x-user') || null;
+  return NextResponse.json({ user });
+}
+-e 
+
+### FILE: src/app/api/prodotti-offerta/route.ts ###
+
+import { NextRequest, NextResponse } from 'next/server';
+
+type Item = {
+  name: string;
+  item_name: string;
+  image?: string;
+};
+
+export async function GET(req: NextRequest) {
+  const limit = parseInt(req.nextUrl.searchParams.get('limit') || '8');
+
+  const listUrl = new URL(`${process.env.ERP_URL}/api/resource/Item`);
+  listUrl.searchParams.set('fields', JSON.stringify(['name', 'item_name', 'image']));
+  listUrl.searchParams.set('filters', JSON.stringify([['is_offer_item', '=', 1]]));
+  listUrl.searchParams.set('limit_page_length', limit.toString());
+
+  try {
+    const response = await fetch(listUrl.toString(), {
+      headers: {
+        Authorization: `token ${process.env.ERP_API_KEY}:${process.env.ERP_API_SECRET}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return NextResponse.json({ error: data.message || 'Errore da ERPNext' }, { status: response.status });
+    }
+
+    const items: Item[] = Array.isArray(data.data)
+      ? data.data.map((item): Item => ({
+          name: item.name,
+          item_name: item.item_name,
+          image: item.image || null,
+        }))
+      : [];
+
+    return NextResponse.json({ items });
+  } catch (error) {
+    console.error('Errore prodotti-offerta:', error);
+    return NextResponse.json({ error: 'Errore di connessione ERPNext' }, { status: 500 });
+  }
+}

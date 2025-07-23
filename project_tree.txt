@@ -1,0 +1,61 @@
+.
+├── 8
+├── README.md
+├── cookie-gestionale.txt
+├── cookies.txt
+├── eslint.config.mjs
+├── middleware.ts
+├── next-env.d.ts
+├── next.config.js
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── project_tree.txt
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── logo-sudimport.jpg
+│   ├── next.svg
+│   ├── prodotti
+│   ├── vercel.svg
+│   └── window.svg
+├── src
+│   ├── app
+│   │   ├── adresse
+│   │   ├── anomalien
+│   │   ├── api
+│   │   ├── bestellungen
+│   │   ├── dokumente
+│   │   ├── einkaufsliste
+│   │   ├── favicon.ico
+│   │   ├── favoriten
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   ├── login
+│   │   ├── page.tsx
+│   │   ├── password
+│   │   ├── passwort-vergessen
+│   │   ├── preise
+│   │   ├── prezzi-test
+│   │   ├── rechnungen
+│   │   ├── registrieren
+│   │   ├── shop
+│   │   ├── user
+│   │   └── zugang
+│   ├── components
+│   │   ├── AngebotDesMonats.tsx
+│   │   ├── Carousel.tsx
+│   │   ├── Footer.tsx
+│   │   ├── Header.tsx
+│   │   ├── Layout.tsx
+│   │   ├── MainMenu.tsx
+│   │   ├── Offerte.tsx
+│   │   ├── ProductCard.tsx
+│   │   └── Slider.tsx
+│   └── lib
+│       ├── erp.ts
+│       └── getSessionUser.ts
+└── tsconfig.json
+
+24 directories, 35 files
