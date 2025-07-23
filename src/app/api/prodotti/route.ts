@@ -1,6 +1,9 @@
-'use server'
+// src/app/api/prodotti/route.ts
 
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+
+export const dynamic = 'force-dynamic'
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = []
@@ -22,24 +25,55 @@ type ContactDetail = {
 async function getCustomer(email: string, headers: Record<string, string>) {
   const base = process.env.ERP_URL!
   console.log('🔍 getCustomer: looking for customer linked to email', email)
+  
+  // Verifica che sia un'email valida
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    console.log('❌ Email non valida:', email)
+    return null
+  }
+  
   try {
-    const emailRes = await fetch(
-      `${base}/api/resource/Contact Email?filters=${encodeURIComponent(
-        JSON.stringify([["email_id", "=", email]])
-      )}`,
-      { headers }
-    )
-    if (!emailRes.ok) return null
+    const filterUrl = `${base}/api/resource/Contact Email?filters=${encodeURIComponent(
+      JSON.stringify([["email_id", "=", email]])
+    )}`
+    console.log('🔍 Cercando Contact Email con URL:', filterUrl)
+    
+    const emailRes = await fetch(filterUrl, { headers })
+    console.log('📡 Response status Contact Email:', emailRes.status)
+    
+    if (!emailRes.ok) {
+      console.log('❌ Errore nella chiamata Contact Email:', emailRes.statusText)
+      return null
+    }
+    
     const emailJson = await emailRes.json()
+    console.log('📧 Contact Email response:', JSON.stringify(emailJson, null, 2))
+    
     const contacts: string[] = emailJson.data?.map((e: { parent: string }) => e.parent) || []
+    console.log('👥 Contatti trovati:', contacts)
+
+    if (contacts.length === 0) {
+      console.log('❌ Nessun contatto trovato per email:', email)
+      return null
+    }
 
     for (const contactName of contacts) {
+      console.log('🔍 Esaminando contatto:', contactName)
       const detRes = await fetch(
         `${base}/api/resource/Contact/${encodeURIComponent(contactName)}?fields=["links"]`,
         { headers }
       )
-      if (!detRes.ok) continue
+      console.log('📡 Response status Contact details:', detRes.status)
+      
+      if (!detRes.ok) {
+        console.log('❌ Errore nel recupero dettagli contatto:', contactName)
+        continue
+      }
+      
       const detJson = await detRes.json()
+      console.log('🔗 Links del contatto:', JSON.stringify(detJson.data?.links, null, 2))
+      
       const detail: ContactDetail = detJson.data
       const customerLink = detail.links?.find(l => l.link_doctype === 'Customer')
       if (customerLink) {
@@ -48,6 +82,7 @@ async function getCustomer(email: string, headers: Record<string, string>) {
       }
     }
 
+    console.log('❌ Nessun customer trovato nei link dei contatti')
     return null
   } catch (err) {
     console.error('❌ ERRORE getCustomer:', err)
@@ -69,9 +104,35 @@ export async function GET(req: Request) {
     'Content-Type': 'application/json'
   }
 
-  const email = req.headers.get('x-user') || ''
-  const isLoggedIn = Boolean(email)
+  // Ottieni email da multiple fonti con priorità
+  let email = '';
+  
+  // 1. Prima controlla header x-user
+  const headerEmail = req.headers.get('x-user');
+  if (headerEmail && headerEmail.includes('@')) {
+    email = headerEmail;
+    console.log('📧 Email da header x-user:', email);
+  } else {
+    // 2. Poi controlla cookie user_email
+    const cookieEmail = cookies().get('user_email')?.value;
+    if (cookieEmail && cookieEmail.includes('@')) {
+      email = cookieEmail;
+      console.log('📧 Email da cookie user_email:', email);
+    } else {
+      // 3. Fallback: controlla se c'è un cookie sid e prova a ricavare l'utente
+      const sidCookie = cookies().get('sid')?.value;
+      if (sidCookie) {
+        console.log('🍪 Cookie sid presente, ma email mancante');
+        // Potresti fare una chiamata a ERPNext per ottenere l'utente corrente
+        // Ma per ora lasciamo vuoto
+      }
+    }
+  }
+  
+  const isLoggedIn = Boolean(email && email.includes('@'))
   console.log('🔐 User Email:', email)
+  console.log('📧 Email source:', headerEmail ? 'header' : cookieEmail ? 'cookie' : 'none')
+  console.log('🔑 Is logged in:', isLoggedIn)
 
   try {
     const filters: [string, string, string][] = []
@@ -105,8 +166,8 @@ export async function GET(req: Request) {
     const customer = isLoggedIn ? await getCustomer(email, headers) : null
     console.log('👤 Cliente associato:', customer)
 
-    // 🔴 fetchPrices può essere reinserita qui (funzione esterna separata) se vuoi debug completo anche lì
-    const priceMap = {} // placeholder per evitare errore
+    // Placeholder per i prezzi - dovrai implementare fetchPrices se necessario
+    const priceMap = {}
 
     const enriched = items.map(item => {
       const prices = priceMap[item.name] || {}

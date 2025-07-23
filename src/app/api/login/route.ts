@@ -1,39 +1,52 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server'
 
+/**
+ * POST /api/login
+ * Body JSON: { usr, pwd }
+ * Autentica su ERPNext, propaga cookie 'sid' (http-only) e 'user'.
+ */
 export async function POST(req: Request) {
-  const { usr, pwd } = await req.json();
+  const { usr, pwd } = await req.json()
 
   try {
-    const res = await fetch('https://gestionale.sudimport.website/api/method/login', {
+    // 1️⃣ Chiamata a ERPNext
+    const erp = await fetch(`${process.env.ERP_URL}/api/method/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usr, pwd }),
-    });
+      body: new URLSearchParams({ usr, pwd }),
+      credentials: 'include'
+    })
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      return NextResponse.json({ message: data.message || 'Login fehlgeschlagen.' }, { status: 401 });
+    const data = await erp.json()
+    if (!erp.ok && data?.message !== 'No App') {
+      return NextResponse.json(
+        { message: data.message || 'Login fehlgeschlagen.' },
+        { status: 401 }
+      )
     }
 
-    // Recupera il cookie 'sid' dalla risposta originale ERPNext
-    const raw = res.headers.getSetCookie();
-    const sidCookie = raw?.find((c) => c.includes('sid=')) || '';
+    const res = NextResponse.json({ message: 'Login erfolgreich' })
 
-    const response = NextResponse.json({ message: 'Login erfolgreich' });
-
-    // Imposta cookie nel browser per la sessione
-    if (sidCookie) {
-      const sessionId = sidCookie.split(';')[0].split('=')[1];
-      response.cookies.set('sid', sessionId, {
-        httpOnly: false,
+    // 2️⃣ Copia cookie 'sid'
+    const setCookie = erp.headers.get('set-cookie')      // singolare
+    if (setCookie?.includes('sid=')) {
+      const sid = setCookie.split(';')[0].split('=')[1]
+      res.cookies.set('sid', sid, {
+        httpOnly: true,
         path: '/',
         sameSite: 'lax'
-      });
+      })
     }
 
-    return response;
-  } catch (error) {
-    return NextResponse.json({ message: 'Serverfehler beim Login.' }, { status: 500 });
+    // 3️⃣ Cookie custom con email
+    res.cookies.set('user', usr, {
+      httpOnly: false,
+      path: '/',
+      sameSite: 'lax'
+    })
+
+    return res
+  } catch (err) {
+    console.error('Login error:', err)
+    return NextResponse.json({ message: 'Serverfehler beim Login.' }, { status: 500 })
   }
 }

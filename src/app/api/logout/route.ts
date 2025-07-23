@@ -1,23 +1,25 @@
+import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+
 export async function POST() {
   try {
-    // Logout anche su ERPNext
-    const frappeLogout = await fetch('https://gestionale.sudimport.website/api/method/logout', {
+    // logout ERPNext
+    await fetch(`${process.env.ERP_URL}/api/method/logout`, {
       method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+      credentials: 'include'
+    })
 
-    const result = await frappeLogout.json();
+    // prepara risposta
+    const res = NextResponse.json({ success: true })
 
-    return new Response(JSON.stringify({ success: true, frappe: result }), {
-      status: 200,
-    });
-  } catch (error) {
-    console.error('Logout Error:', error);
-    return new Response(JSON.stringify({ success: false, error: 'Logout failed' }), {
-      status: 500,
-    });
+    // cancella cookie locali
+    const jar = cookies()
+    jar.delete('sid',  { path: '/' })
+    jar.delete('user', { path: '/' })
+
+    return res
+  } catch (err) {
+    console.error('Logout error:', err)
+    return NextResponse.json({ success: false }, { status: 500 })
   }
 }
