@@ -1,6 +1,6 @@
 'use client';
 
-import UserLayout from '../user/UserLayout';
+import UserLayout from '';
 
 export default function AnomalienPage() {
   return (

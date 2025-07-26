@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import UserLayout from '../user/UserLayout';
+import UserLayout from '';
 
 interface Item {
   name: string;
