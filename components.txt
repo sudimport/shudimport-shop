@@ -1,0 +1,13 @@
+/home/th_digiulio/shop/src/components
+├── AngebotDesMonats.tsx
+├── Carousel.tsx
+├── Footer.tsx
+├── Header.tsx
+├── Layout.tsx
+├── MainMenu.tsx
+├── Offerte.tsx
+├── ProductCard.tsx
+├── Slider.tsx
+└── UserSidebar.tsx
+
+1 directory, 10 files
