@@ -1,82 +1,74 @@
-// src/components/account/AccountSidebar.tsx
 'use client';
-
 import Link from 'next/link';
-import { FaUser, FaHeart, FaShoppingCart } from 'react-icons/fa';
+import {
+  FaKey, FaBoxOpen, FaFileInvoice, FaExclamationTriangle,
+  FaHome, FaCheckSquare, FaHeart, FaShoppingCart, FaMoneyBill
+} from 'react-icons/fa';
 
-export type AccountPage =
-  | 'user'
-  | 'zugang'
-  | 'wunschliste'
-  | 'einkaufliste';
+type Page =
+  | 'password' | 'bestellungen' | 'dokumente' | 'anomalien'
+  | 'adresse'  | 'zugang'
+  | 'wunschliste' | 'einkaufliste'
+  | 'preise';
 
-interface AccountSidebarProps {
-  active: AccountPage;
+interface Props {
+  active: Page;
   hasCustomer?: boolean;
 }
 
-export default function AccountSidebar({
-  active,
-  hasCustomer,
-}: AccountSidebarProps) {
-  const itemClass = (page: AccountPage) =>
-    `block px-2 py-1 rounded ${
-      active === page
-        ? 'text-green-700 font-semibold'
-        : 'text-gray-700 hover:underline'
-    }`;
+const items: {section: string; pages: {id: Page; href: string; label: string; icon: JSX.Element}[]}[] = [
+  {
+    section: 'Profil',
+    pages: [
+      { id: 'password',      href: '/password',       label: 'Passwort ändern',      icon: <FaKey/> },
+      { id: 'bestellungen',  href: '/bestellungen',   label: 'Bestellungen',         icon: <FaBoxOpen/> },
+      { id: 'dokumente',     href: '/dokumente',      label: 'Dokumente',            icon: <FaFileInvoice/> },
+      { id: 'anomalien',     href: '/anomalien',      label: 'Anomalien',            icon: <FaExclamationTriangle/> },
+      { id: 'adresse',       href: '/adresse',        label: 'Adresse',              icon: <FaHome/> },
+    ],
+  },
+  {
+    section: 'Listen',
+    pages: [
+      { id: 'wunschliste',   href: '/wunschliste',    label: 'Wunschliste',          icon: <FaHeart/> },
+      { id: 'einkaufliste',  href: '/einkaufliste',   label: 'Einkaufliste',         icon: <FaShoppingCart/> },
+    ],
+  },
+  {
+    section: 'Kunde',
+    pages: [
+      { id: 'preise',        href: '/preise',         label: 'Meine Preise',         icon: <FaMoneyBill/> },
+    ],
+  },
+];
 
+export default function AccountSidebar({ active, hasCustomer }: Props) {
   return (
-    <aside className="w-full md:w-64 bg-gray-100 p-4 space-y-3 border-r border-gray-200">
-      <h2 className="text-lg font-semibold text-green-700 mb-4">Profil</h2>
-
-      <ul className="space-y-2 text-sm">
-        <li>
-          <Link href="/user" className={itemClass('user')}>
-            👤 Profil
-          </Link>
-        </li>
-        <li>
-          <Link href="/zugang" className={itemClass('zugang')}>
-            ✅ Zugang bestätigen
-          </Link>
-        </li>
-
-        {/* Liste */}
-        <div className="border-t pt-3 mt-3">
-          <h3 className="text-sm font-medium text-gray-800 mb-2">Listen</h3>
-          <li>
-            <Link
-              href="/wunschliste"
-              className={itemClass('wunschliste') + ' flex items-center gap-1'}
-            >
-              <FaHeart className="text-red-500" />
-              Wunschliste
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/einkaufliste"
-              className={itemClass('einkaufliste') + ' flex items-center gap-1'}
-            >
-              <FaShoppingCart className="text-blue-500" />
-              Einkaufliste
-            </Link>
-          </li>
-        </div>
-
-        {/* Solo se c’è un cliente collegato */}
-        {hasCustomer && (
-          <div className="border-t pt-3 mt-3">
-            <h3 className="text-sm font-medium text-gray-800 mb-2">Kunde</h3>
-            <li>
-              <Link href="/preise" className="hover:underline">
-                💰 Meine Preise
-              </Link>
-            </li>
+    <aside className="w-full md:w-64 bg-gray-100 p-5 border-r border-gray-200">
+      {items.map(({section, pages}) => (
+        (section !== 'Kunde' || hasCustomer) && (
+          <div key={section} className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">{section}</h3>
+            <ul className="space-y-2 text-sm">
+              {pages.map(p => (
+                (section !== 'Kunde' || hasCustomer) && (
+                  <li key={p.id}>
+                    <Link
+                      href={p.href}
+                      className={`flex items-center gap-2 hover:underline
+                        ${active === p.id ? 'text-green-700 font-medium' : 'text-gray-700'}`}
+                    >
+                      {p.icon}
+                      {p.label}
+                    </Link>
+                  </li>
+                )
+              ))}
+            </ul>
+            {section !== 'Kunde' && <hr className="mt-4 border-gray-300" />}
           </div>
-        )}
-      </ul>
+        )
+      ))}
     </aside>
   );
 }

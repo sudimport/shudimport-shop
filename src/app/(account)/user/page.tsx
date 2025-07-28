@@ -1,4 +1,4 @@
-// src/app/user/page.tsx
+//nano "~/shop/src/app/(account)/user/page.tsx"
 'use client';
 import { useEffect, useState } from 'react';
 import { FaUser, FaHeart, FaShoppingCart } from 'react-icons/fa';
@@ -171,33 +171,6 @@ export default function UserPage() {
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
       {/* Sidebar sinistra */}
-      <aside className="w-full md:w-64 bg-gray-100 p-4 space-y-3 border-r border-gray-200">
-        <h2 className="text-lg font-semibold text-green-700 mb-4">Profil</h2>
-        
-        <ul className="space-y-2 text-sm text-gray-700">
-          <li><Link href="/password" className="hover:underline">🔑 Passwort ändern</Link></li>
-          <li><Link href="/bestellungen" className="hover:underline">📦 Bestellungen</Link></li>
-          <li><Link href="/dokumente" className="hover:underline">📄 Dokumente</Link></li>
-          <li><Link href="/anomalien" className="hover:underline">⚠️ Anomalien</Link></li>
-          <li><Link href="/adresse" className="hover:underline">🏠 Adresse</Link></li>
-          <li><Link href="/zugang" className="hover:underline">✅ Zugang bestätigen</Link></li>
-          
-          {/* Nuove sezioni: Wunschliste e Einkaufliste */}
-          <div className="border-t pt-3 mt-4">
-            <h3 className="text-sm font-medium text-gray-800 mb-2">Listen</h3>
-            <li><Link href="/wunschliste" className="hover:underline flex items-center gap-1"><FaHeart className="text-red-500" /> Wunschliste</Link></li>
-            <li><Link href="/einkaufliste" className="hover:underline flex items-center gap-1"><FaShoppingCart className="text-blue-500" /> Einkaufliste</Link></li>
-          </div>
-          
-          {(userData.customer || userData.linkedCustomer) && (
-            <div className="border-t pt-3 mt-4">
-              <h3 className="text-sm font-medium text-gray-800 mb-2">Kunde</h3>
-              <li><Link href="/preise" className="hover:underline">💰 Meine Preise</Link></li>
-            </div>
-          )}
-        </ul>
-      </aside>
-
       {/* Contenuto utente */}
       <main className="flex-1 p-6">
         <div className="flex flex-col items-center mb-6">
@@ -287,5 +260,5 @@ export default function UserPage() {
       {/* Notifiche toast */}
       <Toaster position="top-right" />
     </div>
-  );
+  ) ;
 }

@@ -1,11 +1,14 @@
+//nano ~/shop/src/app/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+
 import Carousel from '../components/Carousel';
 import Offerte from '../components/Offerte';
 import AngebotDesMonats from '../components/AngebotDesMonats';
+import NuoviArrivi from '@/components/NuoviArrivi';
 
 type Prodotto = {
   name: string;
@@ -30,13 +33,16 @@ export default function HomePage() {
       {/* Banner Carousel */}
       <Carousel />
 
-      {/* Angebot des Monats */}
+      {/* Nuovi Arrivi */}
+      <NuoviArrivi />
+
+      {/* Prodotto del Mese */}
       <AngebotDesMonats />
 
       {/* Offerte Speciali */}
       <Offerte />
 
-     {/* Categorie Sudimport */}
+      {/* Altre sezioni future */}
     </div>
   );
 }

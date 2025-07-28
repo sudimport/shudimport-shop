@@ -12,30 +12,32 @@ type Prodotto = {
   discount?: string
 }
 
-export default function ProdottiConsigliati() {
+export default function NuoviArrivi() {
   const [items, setItems] = useState<Prodotto[]>([])
   const [loading, setLoading] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Fetch per prodotti consigliati - usa un endpoint specifico o con filtro
-    fetch('/api/prodotti-consigliati')
+    // Prima carica i prodotti
+    fetch('/api/nuovi-arrivi')
       .then(res => res.json())
       .then(async data => {
         const products = data.items || data.data || []
         
-        // Recupera i prezzi per ogni prodotto se l'utente è loggato
+        // Poi recupera i prezzi per ogni prodotto se l'utente è loggato
         const itemsWithPrices = await Promise.all(
           products.map(async (item: Prodotto) => {
             try {
+              // Chiama l'API prezzi per ogni prodotto
               const priceRes = await fetch(`/api/prezzi?item=${encodeURIComponent(item.name)}`)
               
               if (priceRes.ok) {
                 const priceData = await priceRes.json()
                 
+                // Se c'è un prezzo, usalo
                 if (priceData.price) {
-                  // Per i consigliati, sconto moderato (5-15%)
-                  const discountPercentage = 5 + (Math.random() * 10)
+                  // Calcola uno sconto fittizio per visualizzazione (10-30%)
+                  const discountPercentage = 10 + (Math.random() * 20)
                   const originalPrice = priceData.price * (1 + discountPercentage / 100)
                   
                   return {
@@ -45,9 +47,14 @@ export default function ProdottiConsigliati() {
                     discount: Math.round(discountPercentage).toString()
                   }
                 }
+              } else if (priceRes.status === 401) {
+                // Utente non loggato
+                console.log('Utente non loggato, prezzi non disponibili')
               }
               
+              // Se non ci sono prezzi o errore, ritorna item senza prezzi
               return item
+              
             } catch (error) {
               console.error(`Errore recupero prezzo per ${item.name}:`, error)
               return item
@@ -57,45 +64,7 @@ export default function ProdottiConsigliati() {
         
         setItems(itemsWithPrices)
       })
-      .catch(error => {
-        // Fallback se non c'è endpoint specifico
-        console.error('Error fetching recommended:', error)
-        fetch('/api/prodotti?page=1&limit=20')
-          .then(res => res.json())
-          .then(async data => {
-            const products = (data.items || []).slice(0, 12)
-            
-            const itemsWithPrices = await Promise.all(
-              products.map(async (item: Prodotto) => {
-                try {
-                  const priceRes = await fetch(`/api/prezzi?item=${encodeURIComponent(item.name)}`)
-                  
-                  if (priceRes.ok) {
-                    const priceData = await priceRes.json()
-                    
-                    if (priceData.price) {
-                      const discountPercentage = 5 + (Math.random() * 10)
-                      const originalPrice = priceData.price * (1 + discountPercentage / 100)
-                      
-                      return {
-                        ...item,
-                        price: priceData.price.toFixed(2),
-                        original_price: originalPrice.toFixed(2),
-                        discount: Math.round(discountPercentage).toString()
-                      }
-                    }
-                  }
-                  
-                  return item
-                } catch (error) {
-                  return item
-                }
-              })
-            )
-            
-            setItems(itemsWithPrices)
-          })
-      })
+      .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
@@ -114,10 +83,10 @@ export default function ProdottiConsigliati() {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-blue-800 to-blue-900 py-16">
+      <div className="bg-gradient-to-br from-emerald-700 to-emerald-900 py-16">
         <div className="text-center">
           <div className="animate-spin h-12 w-12 border-4 border-white/20 border-t-white rounded-full mx-auto mb-4" />
-          <p className="text-white font-medium text-lg">Caricamento prodotti consigliati…</p>
+          <p className="text-white font-medium text-lg">Caricamento nuovi arrivi…</p>
         </div>
       </div>
     )
@@ -125,46 +94,41 @@ export default function ProdottiConsigliati() {
 
   if (items.length === 0) {
     return (
-      <div className="bg-gradient-to-br from-blue-800 to-blue-900 py-16">
-        <p className="text-center text-white font-medium text-lg">Nessun prodotto consigliato disponibile.</p>
+      <div className="bg-gradient-to-br from-emerald-700 to-emerald-900 py-16">
+        <p className="text-center text-white font-medium text-lg">Nessun nuovo arrivo disponibile.</p>
       </div>
     )
   }
 
   return (
-    <section className="bg-gradient-to-br from-blue-800 to-blue-900 py-12 mb-8 relative overflow-hidden">
+    <section className="bg-gradient-to-br from-emerald-700 to-emerald-900 py-12 mb-8 relative overflow-hidden">
       {/* Pattern decorativo di sfondo */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-full h-full" 
-               style={{
-                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255,255,255,.05) 35px, rgba(255,255,255,.05) 70px)'
-               }}>
-          </div>
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute transform rotate-45 -top-24 -right-24 w-96 h-96 bg-white rounded-full"></div>
+          <div className="absolute transform rotate-45 -bottom-24 -left-24 w-96 h-96 bg-white rounded-full"></div>
         </div>
       </div>
-     
+
       <div className="max-w-[1400px] mx-auto px-4 relative z-10">
-        {/* Header elegante */}
+        {/* Header accattivante */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-4">
-            <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            <span className="text-white/90 text-sm font-medium uppercase tracking-wider">Von uns empfohlen</span>
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="text-white/90 text-sm font-medium uppercase tracking-wider">Neu eingetroffen</span>
           </div>
           
           <h2 className="text-5xl font-bold text-white mb-4">
-            UNSERE EMPFEHLUNGEN<br />
-            <span className="text-3xl font-light text-white/80">FÜR IHREN ERFOLG</span>
+            DIE NEUANKÖMMLINGE<br />
+            <span className="text-3xl font-light text-white/80">DIESER WOCHE</span>
           </h2>
           
           <p className="text-white/70 text-lg max-w-2xl mx-auto">
-            Handverlesene Produkte, die sich in der Gastronomie bewährt haben
+            Entdecke unsere handverlesene Auswahl der neuesten Produkte für Gastronomie und Gewerbe
           </p>
         </div>
 
-        {/* Controlli navigazione */}
+        {/* Controlli navigazione eleganti */}
         <div className="flex justify-end gap-2 mb-6">
           <button
             onClick={() => scroll('left')}
@@ -186,9 +150,11 @@ export default function ProdottiConsigliati() {
 
         {/* Carousel container */}
         <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-blue-900 via-blue-900/50 to-transparent z-10 pointer-events-none"></div>
-          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-blue-900 via-blue-900/50 to-transparent z-10 pointer-events-none"></div>
+          {/* Gradients laterali più morbidi */}
+          <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-emerald-800 via-emerald-800/50 to-transparent z-10 pointer-events-none"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-emerald-800 via-emerald-800/50 to-transparent z-10 pointer-events-none"></div>
           
+          {/* Carousel scrollabile */}
           <div 
             ref={scrollRef}
             className="flex gap-6 overflow-x-auto scrollbar-hide scroll-smooth pb-4"
@@ -200,28 +166,17 @@ export default function ProdottiConsigliati() {
                 href={`/shop?product=${encodeURIComponent(item.name)}`}
                 className="flex-none w-[300px] bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-300 group"
               >
-                {/* Badge consigliato */}
-                <div className="absolute top-4 right-4 z-10">
-                  <div className="bg-yellow-400 text-blue-900 p-2 rounded-full shadow-lg">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Rating stelle */}
+                {/* Badge nuovo con animazione */}
                 <div className="absolute top-4 left-4 z-10">
-                  <div className="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <svg key={i} className={`w-4 h-4 ${i < 4 ? 'text-yellow-400' : 'text-gray-300'}`} fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                    <span className="text-xs text-gray-600 ml-1">4.8</span>
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-orange-500 blur animate-pulse"></div>
+                    <span className="relative bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide shadow-lg">
+                      Neu
+                    </span>
                   </div>
                 </div>
 
-                {/* Container immagine */}
+                {/* Container immagine migliorato */}
                 <div className="relative h-[280px] bg-gradient-to-br from-gray-50 to-gray-100 p-8">
                   {item.image ? (
                     <Image
@@ -241,43 +196,40 @@ export default function ProdottiConsigliati() {
                   )}
                 </div>
 
-                {/* Info prodotto */}
+                {/* Info prodotto con design migliorato */}
                 <div className="p-6">
-                  {/* Tag categoria */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">
-                      Bestseller
-                    </span>
-                    <span className="text-xs text-gray-500 uppercase tracking-wider">
-                      {item.name || 'Professional'}
-                    </span>
-                  </div>
+                  {/* Categoria */}
+                  <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+                    {item.name || 'Premium Serie'}
+                  </p>
                   
                   {/* Nome prodotto */}
                   <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 mb-4 min-h-[3.5rem]">
                     {item.item_name}
                   </h3>
 
-                  {/* Prezzi */}
+                  {/* Prezzi prominenti */}
                   <div className="space-y-2 border-t pt-4">
                     {item.price ? (
                       <>
+                        {/* Prezzo originale e sconto */}
                         {item.original_price && item.discount && (
                           <div className="flex items-center justify-between">
                             <div className="flex items-baseline gap-2">
                               <span className="text-sm text-gray-500 line-through">
                                 {item.original_price} €
                               </span>
-                              <span className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-bold">
+                              <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full font-bold">
                                 -{item.discount}%
                               </span>
                             </div>
                           </div>
                         )}
                         
+                        {/* Prezzo finale grande */}
                         <div className="flex items-end justify-between">
                           <div>
-                            <p className="text-3xl font-bold text-blue-900">
+                            <p className="text-3xl font-bold text-gray-900">
                               {item.price} €
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
@@ -285,7 +237,8 @@ export default function ProdottiConsigliati() {
                             </p>
                           </div>
                           
-                          <button className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 transform hover:scale-110 transition-all shadow-lg">
+                          {/* Bottone aggiungi */}
+                          <button className="bg-emerald-600 text-white p-3 rounded-full hover:bg-emerald-700 transform hover:scale-110 transition-all shadow-lg">
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
@@ -303,6 +256,7 @@ export default function ProdottiConsigliati() {
                           </p>
                         </div>
                         
+                        {/* Bottone info */}
                         <button className="bg-gray-400 text-white p-3 rounded-full hover:bg-gray-500 transition-all shadow-lg">
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -312,19 +266,19 @@ export default function ProdottiConsigliati() {
                     )}
                   </div>
 
-                  {/* Info extra */}
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t text-xs text-gray-500">
+                  {/* Quick info */}
+                  <div className="flex items-center gap-4 mt-4 pt-4 border-t text-xs text-gray-500">
                     <span className="flex items-center gap-1">
-                      <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Verfügbar
+                      Sofort lieferbar
                     </span>
                     <span className="flex items-center gap-1">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Schnelle Lieferung
+                      Premium
                     </span>
                   </div>
                 </div>
@@ -336,10 +290,10 @@ export default function ProdottiConsigliati() {
         {/* CTA finale */}
         <div className="text-center mt-10">
           <Link 
-            href="/shop?filter=recommended" 
-            className="inline-flex items-center gap-3 bg-white text-blue-800 px-8 py-4 rounded-full font-semibold hover:bg-gray-100 transform hover:scale-105 transition-all shadow-lg"
+            href="/shop?filter=new" 
+            className="inline-flex items-center gap-3 bg-white text-emerald-700 px-8 py-4 rounded-full font-semibold hover:bg-gray-100 transform hover:scale-105 transition-all shadow-lg"
           >
-            Alle Empfehlungen ansehen
+            Alle Neuheiten entdecken
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
