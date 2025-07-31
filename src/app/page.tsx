@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
-import Carousel from '../components/Carousel';
 import Offerte from '../components/Offerte';
 import AngebotDesMonats from '../components/AngebotDesMonats';
 import NuoviArrivi from '@/components/NuoviArrivi';
@@ -30,18 +29,13 @@ export default function HomePage() {
 
   return (
     <div className="space-y-16 pb-16">
-      {/* Banner Carousel */}
-      <Carousel />
 
       {/* Nuovi Arrivi */}
       <NuoviArrivi />
-
       {/* Prodotto del Mese */}
       <AngebotDesMonats />
-
       {/* Offerte Speciali */}
       <Offerte />
-
       {/* Altre sezioni future */}
     </div>
   );

@@ -1,0 +1,206 @@
+use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import { useCartStore } from '../../store/cart';
+import ShopSidebar from '../../components/ShopSidebar';
+
+interface Prodotto {
+  name: string;
+  item_name: string;
+  item_group: string;
+  image: string | null;
+  description: string;
+  price: number | null;
+  item_code?: string;
+  item_url?: string;
+  uom?: string;
+  weight_per_unit?: string | null;
+  pack_size?: string | null;
+  minimum_order_qty?: number;
+  price_per_uom?: string;
+  shelf_life?: string | null;
+  origin?: string | null;
+  is_on_offer?: boolean;
+  is_new?: boolean;
+  is_available?: boolean;
+}
+
+export default function ShopPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { addToCart, items: cartItems } = useCartStore();
+
+  const [items, setItems] = useState<Prodotto[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [categoria, setCategoria] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>('');
+  const [min, setMin] = useState<string>('');
+  const [max, setMax] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const LIMIT = 20;
+  const totalPages = Math.ceil(total / LIMIT);
+
+  // Read categoria from URL
+  useEffect(() => {
+    const cat = searchParams.get('categoria');
+    setCategoria(cat);
+    setPage(1);
+  }, [searchParams]);
+
+  // Fetch products when filters change
+  useEffect(() => {
+    setLoading(true);
+    const qs = new URLSearchParams();
+    qs.set('page', String(page));
+    qs.set('limit', String(LIMIT));
+    if (categoria && !search) qs.set('categoria', categoria);
+    if (search) qs.set('search', search);
+    if (min) qs.set('prezzo_min', min);
+    if (max) qs.set('prezzo_max', max);
+
+    fetch(`/api/prodotti?${qs.toString()}`, {
+      headers: { 'x-user': localStorage.getItem('username') || '' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setItems(Array.isArray(data.items) ? data.items : []);
+        setTotal(typeof data.total === 'number' ? data.total : 0);
+      })
+      .catch(() => {
+        setItems([]);
+        setTotal(0);
+      })
+      .finally(() => setLoading(false));
+  }, [categoria, search, min, max, page]);
+
+  const handleCategoryChange = (cat: string | null) => {
+    setCategoria(cat);
+    setPage(1);
+  };
+
+  const resetFilters = () => {
+    setSearch('');
+    setMin('');
+    setMax('');
+    setCategoria(null);
+    setPage(1);
+    router.push('/shop');
+  };
+
+  const handleSearch = () => {
+    setPage(1);
+  };
+
+  const makePages = (total: number, current: number): number[] => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = new Set<number>([1, total, current]);
+    if (current > 1) pages.add(current - 1);
+    if (current > 2) pages.add(current - 2);
+    if (current < total) pages.add(current + 1);
+    if (current < total - 1) pages.add(current + 2);
+    return Array.from(pages).sort((a, b) => a - b);
+  };
+
+  const handleAddToCart = (item: Prodotto) => {
+    if (!item.price) {
+      alert('Questo prodotto richiede il login per vedere il prezzo');
+      return;
+    }
+
+    addToCart({
+      name: item.name,
+      item_name: item.item_name,
+      price: item.price,
+      image: item.image,
+      uom: item.uom,
+      weight_per_unit: item.weight_per_unit,
+      pack_size: item.pack_size,
+      minimum_order_qty: item.minimum_order_qty,
+      price_per_uom: item.price_per_uom
+    });
+
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all duration-300';
+    const uomInfo = item.weight_per_unit ? ` (${item.weight_per_unit})` : '';
+    toast.innerHTML = `
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <span>Artikel hinzugefügt${uomInfo}!</span>
+      </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+  };
+
+  const isInCart = (productName: string) => {
+    return cartItems.some(item => item.name === productName);
+  };
+
+  const getCartQuantity = (productName: string) => {
+    const cartItem = cartItems.find(item => item.name === productName);
+    return cartItem ? cartItem.qty : 0;
+  };
+
+  const isProductCodeSearch = (searchTerm: string): boolean => {
+    return /^[A-Z]{3}-[A-Z]{4}-\d{4}-\d{5}$/i.test(searchTerm) || 
+           /^STO-ITEM-\d{4}-\d{5}$/i.test(searchTerm);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar Component */}
+      <ShopSidebar 
+        onCategoryChange={handleCategoryChange}
+        selectedCategory={categoria}
+      />
+
+      {/* Main Content Area - Grafica Originale */}
+      <div className="flex-1">
+        {/* Header Section */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="text-center mb-8">
+              {categoria ? (
+                <div className="mb-4">
+                  <div className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    Kategorie: {categoria}
+                  </div>
+                  <h1 className="text-4xl font-bold text-gray-900 mb-2">{categoria}</h1>
+                </div>
+              ) : (
+                <h1 className="text-4xl font-bold text-gray-900 mb-2">Shop Sudimport</h1>
+              )}
+              <p className="text-gray-600">Entdecken Sie unsere Premium-Auswahl für Gastronomie und Gewerbe</p>
+            </div>
+
+            {/* Filters Section - SENZA categoria dropdown */}
+            <div className="bg-gray-50 rounded-2xl p-6 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                {/* Search */}
+                <div className="lg:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Suche
+                    {search && isProductCodeSearch(search) && (
+                      <span className="ml-2 text-xs text-green-600 font-semibold">(Produktcode)</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Produktname oder Code (z.B. STO-ITEM-2025-02734)..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    onKeyPress={e => e.key === 'Enter' && handleSearch()}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                  />
+                </div>
+                

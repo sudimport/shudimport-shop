@@ -1,0 +1,180 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import Image from 'next/image'
+import Link from 'next/link'
+import { useCartStore } from '../../../store/cart'
+
+interface Prodotto {
+  name: string
+  item_name: string
+  description?: string
+  image?: string
+  price?: string
+  original_price?: string
+  discount?: string
+  stock_uom?: string
+  weight_per_unit?: string
+  pack_size?: string
+  minimum_order_qty?: number
+  shelf_life?: string
+  origin?: string
+  tax_category?: string
+  vat_percent?: string // ← AGGIUNTO per IVA corretta
+  alternative_uoms?: Array<{
+    uom: string
+    conversion_factor: number
+  }> // ← AGGIUNTO per UOM alternative
+}
+
+export default function ProductDetailPage() {
+  const { slug } = useParams()
+  const [item, setItem] = useState<Prodotto | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [quantity, setQuantity] = useState(1)
+  const { addToCart, items: cartItems } = useCartStore()
+
+  useEffect(() => {
+    fetch(`/api/prodotto/${slug}`, {
+      headers: {
+        'x-user': localStorage.getItem('username') || ''
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        setItem(data.item || null)
+        // Set minimum quantity if available
+        if (data.item?.minimum_order_qty) {
+          setQuantity(data.item.minimum_order_qty)
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [slug])
+
+  const handleAddToCart = () => {
+    if (!item?.price) return
+
+    for (let i = 0; i < quantity; i++) {
+      addToCart({
+        name: item.name,
+        item_name: item.item_name,
+        price: parseFloat(item.price),
+        image: item.image || null,
+        uom: item.stock_uom,
+        weight_per_unit: item.weight_per_unit,
+        pack_size: item.pack_size,
+        minimum_order_qty: item.minimum_order_qty,
+        price_per_uom: item.stock_uom ? `€/${item.stock_uom}` : undefined
+      })
+    }
+
+    // Toast notification
+    const toast = document.createElement('div')
+    toast.className = 'fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all duration-300'
+    toast.innerHTML = `
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <span>${quantity} ${item.stock_uom || 'Artikel'} zum Warenkorb hinzugefügt!</span>
+      </div>
+    `
+    document.body.appendChild(toast)
+    setTimeout(() => toast.remove(), 3000)
+  }
+
+  const isInCart = item ? cartItems.some(cartItem => cartItem.name === item.name) : false
+  const cartQuantity = item ? cartItems.find(cartItem => cartItem.name === item.name)?.qty || 0 : 0
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-12 w-12 border-4 border-green-600 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Produktdetails werden geladen...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!item) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center py-20">
+          <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg className="w-12 h-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-6M4 13h6m4 0a2 2 0 100 4 2 2 0 000-4z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Produkt nicht gefunden</h2>
+          <p className="text-gray-600 mb-8">Das angeforderte Produkt existiert nicht oder wurde entfernt.</p>
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Zurück zum Shop
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const price = parseFloat(item.price || '0')
+  const originalPrice = item.original_price ? parseFloat(item.original_price) : null
+  const hasDiscount = item.discount && originalPrice
+  
+  // Usa vat_percent dall'API se disponibile, altrimenti fallback
+  const vatPercent = item.vat_percent ? parseFloat(item.vat_percent) : 19
+  const taxRate = vatPercent / 100
+  const vatAmount = price * taxRate
+  const grossPrice = price + vatAmount
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Breadcrumb */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <nav className="flex items-center gap-2 text-sm text-gray-600">
+            <Link href="/" className="hover:text-green-600 transition-colors">Startseite</Link>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <Link href="/shop" className="hover:text-green-600 transition-colors">Produktkatalog</Link>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            <span className="text-gray-900 font-medium">{item.item_name}</span>
+          </nav>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
+          
+          {/* Product Images */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-200">
+              {item.image ? (
+                <Image
+                  src={`https://gestionale.sudimport.website${item.image}`}
+                  alt={item.item_name}
+                  width={600}
+                  height={600}
+                  className="object-contain w-full h-[500px] rounded-xl"
+                  unoptimized
+                />
+              ) : (
+                <div className="h-[500px] flex flex-col items-center justify-center text-gray-400 bg-gray-50 rounded-xl">
+                  <svg className="w-24 h-24 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-lg font-medium">Produktbild folgt</p>
+                </div>
+              )}
+            </div>
+            

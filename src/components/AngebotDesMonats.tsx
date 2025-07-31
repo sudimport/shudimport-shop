@@ -24,49 +24,65 @@ export default function ProdottiConsigliati() {
       .then(async data => {
         const products = data.items || data.data || []
         
-        // Recupera i prezzi per ogni prodotto se l'utente è loggato
-        const itemsWithPrices = await Promise.all(
-          products.map(async (item: Prodotto) => {
-            try {
-              const priceRes = await fetch(`/api/prezzi?item=${encodeURIComponent(item.name)}`)
-              
-              if (priceRes.ok) {
-                const priceData = await priceRes.json()
+        // Se ci sono prodotti, usa quelli
+        if (products.length > 0) {
+          // Recupera i prezzi per ogni prodotto se l'utente è loggato
+          const itemsWithPrices = await Promise.all(
+            products.map(async (item: Prodotto) => {
+              try {
+                const priceRes = await fetch(`/api/prezzi?item=${encodeURIComponent(item.name)}`)
                 
-                if (priceData.price) {
-                  // Per i consigliati, sconto moderato (5-15%)
-                  const discountPercentage = 5 + (Math.random() * 10)
-                  const originalPrice = priceData.price * (1 + discountPercentage / 100)
+                if (priceRes.ok) {
+                  const priceData = await priceRes.json()
                   
-                  return {
-                    ...item,
-                    price: priceData.price.toFixed(2),
-                    original_price: originalPrice.toFixed(2),
-                    discount: Math.round(discountPercentage).toString()
+                  if (priceData.price) {
+                    // Per i consigliati, sconto moderato (5-15%)
+                    const discountPercentage = 5 + (Math.random() * 10)
+                    const originalPrice = priceData.price * (1 + discountPercentage / 100)
+                    
+                    return {
+                      ...item,
+                      price: priceData.price.toFixed(2),
+                      original_price: originalPrice.toFixed(2),
+                      discount: Math.round(discountPercentage).toString()
+                    }
                   }
                 }
+                
+                return item
+              } catch (error) {
+                console.error(`Errore recupero prezzo per ${item.name}:`, error)
+                return item
               }
-              
-              return item
-            } catch (error) {
-              console.error(`Errore recupero prezzo per ${item.name}:`, error)
-              return item
-            }
-          })
-        )
-        
-        setItems(itemsWithPrices)
+            })
+          )
+          
+          setItems(itemsWithPrices)
+          setLoading(false)
+        } else {
+          // Se non ci sono prodotti consigliati, fallback
+          throw new Error('Nessun prodotto consigliato')
+        }
       })
       .catch(error => {
-        // Fallback se non c'è endpoint specifico
-        console.error('Error fetching recommended:', error)
-        fetch('/api/prodotti?page=1&limit=20')
+        // Fallback: prendi tutti i prodotti e seleziona 50 casuali
+        console.log('Fallback to random products:', error.message)
+        
+        fetch('/api/prodotti')
           .then(res => res.json())
           .then(async data => {
-            const products = (data.items || []).slice(0, 12)
+            let allProducts = data.items || []
             
+            // Se ci sono più di 50 prodotti, seleziona 50 casuali
+            if (allProducts.length > 50) {
+              // Mischia l'array e prendi i primi 50
+              const shuffled = [...allProducts].sort(() => Math.random() - 0.5)
+              allProducts = shuffled.slice(0, 50)
+            }
+            
+            // Recupera i prezzi per i prodotti selezionati
             const itemsWithPrices = await Promise.all(
-              products.map(async (item: Prodotto) => {
+              allProducts.map(async (item: Prodotto) => {
                 try {
                   const priceRes = await fetch(`/api/prezzi?item=${encodeURIComponent(item.name)}`)
                   
@@ -95,8 +111,12 @@ export default function ProdottiConsigliati() {
             
             setItems(itemsWithPrices)
           })
+          .catch(err => {
+            console.error('Errore completo:', err)
+            setItems([])
+          })
+          .finally(() => setLoading(false))
       })
-      .finally(() => setLoading(false))
   }, [])
 
   const scroll = (direction: 'left' | 'right') => {
@@ -130,7 +150,6 @@ export default function ProdottiConsigliati() {
       </div>
     )
   }
-
   return (
     <section className="bg-gradient-to-br from-blue-800 to-blue-900 py-12 mb-8 relative overflow-hidden">
       {/* Pattern decorativo di sfondo */}
@@ -143,7 +162,7 @@ export default function ProdottiConsigliati() {
           </div>
         </div>
       </div>
-     
+
       <div className="max-w-[1400px] mx-auto px-4 relative z-10">
         {/* Header elegante */}
         <div className="text-center mb-10">
